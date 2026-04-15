@@ -1,0 +1,106 @@
+tutaj wazne rzeczy:
+
+//TWORZENIE SHARED MUTEX :D
+
+typedef struct {
+    pthread_mutex_t mutex;
+    int counter;
+} shared_t;
+
+shared_t *sh = mmap(...);
+
+pthread_mutexattr_t attr;
+pthread_mutexattr_init(&attr);
+
+// to robi go między procesami
+pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+
+// to robi go robust
+pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST);
+
+// init mutexa
+pthread_mutex_init(&sh->mutex, &attr);
+
+//UZYCIE
+
+int err = pthread_mutex_lock(&sh->mutex);
+
+if (err == EOWNERDEAD) {
+    printf("poprzedni proces umarl\n");
+    pthread_mutex_consistent(&sh->mutex);
+}
+
+sh->counter++;
+
+pthread_mutex_unlock(&sh->mutex);
+
+
+
+
+//TWORZENIE SHARED BAREIRY
+
+typedef struct {
+    pthread_barrier_t barrier;
+} shared_t;
+
+
+shared_t *sh = mmap(...);
+
+pthread_barrierattr_t attr;
+pthread_barrierattr_init(&attr);
+
+// kluczowe
+pthread_barrierattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+
+// 3 procesy
+pthread_barrier_init(&sh->barrier, &attr, 3);
+
+//uzycie
+
+printf("before barrier\n");
+
+pthread_barrier_wait(&sh->barrier);
+
+printf("after barrier\n");
+
+
+
+//przykladowy kod
+
+typedef struct {
+    pthread_barrier_t barrier;
+} shared_t;
+
+int main() {
+    shared_t *sh = mmap(NULL, sizeof(shared_t),
+                        PROT_READ | PROT_WRITE,
+                        MAP_SHARED | MAP_ANONYMOUS,
+                        -1, 0);
+
+    pthread_barrierattr_t attr;
+    pthread_barrierattr_init(&attr);
+    pthread_barrierattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+
+    pthread_barrier_init(&sh->barrier, &attr, 3);
+
+    for (int i = 0; i < 2; i++) {
+        if (fork() == 0) {
+            printf("child before\n");
+            pthread_barrier_wait(&sh->barrier);
+            printf("child after\n");
+            exit(0);
+        }
+    }
+
+    printf("parent before\n");
+    pthread_barrier_wait(&sh->barrier);
+    printf("parent after\n");
+
+    while (wait(NULL) > 0);
+}
+
+link do polskich sopow:
+
+https://github.com/mixasolop/ops2_l7_pl
+
+
