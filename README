@@ -99,6 +99,15 @@ int main() {
     while (wait(NULL) > 0);
 }
 
+//shared memory object
+
+int fd = shm_open("/my_mem", O_CREAT | O_RDWR, 0666);
+ftruncate(fd, 1024);
+
+char *mem = mmap(NULL, 1024, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+
+
+
 link do polskich sopow:
 
 https://github.com/mixasolop/ops2_l7_pl
