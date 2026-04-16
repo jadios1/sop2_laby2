@@ -72,7 +72,7 @@ typedef struct {
 } shared_t;
 
 int main() {
-    shared_t *sh = mmap(NULL, sizeof(shared_t),
+    shared_t *sh = mmap(NULL, sizeof(*sh),
                         PROT_READ | PROT_WRITE,
                         MAP_SHARED | MAP_ANONYMOUS,
                         -1, 0);
@@ -83,12 +83,20 @@ int main() {
 
     pthread_barrier_init(&sh->barrier, &attr, 3);
 
+    // usuwanie rzeczy od bariery to powinno byc na koncu
+    // pthread_barrierattr_destroy(&barrier_attr);
+    // pthread_barrier_destroy(&data->barrier);
+
     for (int i = 0; i < 2; i++) {
-        if (fork() == 0) {
+        switch (fork()) {
+        case 0:
             printf("child before\n");
             pthread_barrier_wait(&sh->barrier);
             printf("child after\n");
             exit(0);
+        case -1:
+            perror("fork:");
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -97,19 +105,63 @@ int main() {
     printf("parent after\n");
 
     while (wait(NULL) > 0);
+    // lub bardziej safe
+    // pid_t pid;
+    // for (;;) {
+    //     pid = wait(NULL);
+    //     if (pid <= 0) {
+    //         if (errno == ECHILD)
+    //             break;
+    //         ERR("waitpid");
+    //     }
+    // }
 }
 
 //shared memory object
-
+//                                            |mozna tez dac O_EXCL zeby byc pewnym ze tworzymy to gowienko jesli jeszcze nie istnieje
+// w sytuacji kryzysowej rm /dev/shm/my_mem   |
 int fd = shm_open("/my_mem", O_CREAT | O_RDWR, 0666);
 ftruncate(fd, 1024);
 
 char *mem = mmap(NULL, 1024, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+if(mem == MAP_FAILED) {
+    ERR("mmap");
+}
 
 
 
 link do polskich sopow:
 
 https://github.com/mixasolop/ops2_l7_pl
+https://github.com/Puszek997/lab6
+
+// wazne
+
+//parent
+int shm_fd;
+int shm_size = keyboard_count * key_count * sizeof(double);
+if ((shm_fd = shm_open(SHARED_MEM_NAME, O_CREAT | O_EXCL | O_RDWR, 0666)) == -1) {
+    ERR("shm_open");
+}
+if (ftruncate(shm_fd, shm_size) == -1) {
+    ERR("ftruncate");
+}
+
+double* shm_ptr;
+if ((shm_ptr = mmap(NULL, shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
+    ERR("mmap");
+}
 
 
+// children, nie ma: ftruncate, O_CREAT | O_EXCL
+int shm_fd;
+int shm_size = keyboard_count * key_count * sizeof(double);
+if ((shm_fd = shm_open(SHARED_MEM_NAME, O_RDWR, 0666)) == -1) {
+    ERR("shm_open");
+}
+
+// to samo co w parent
+double* shm_ptr;
+if ((shm_ptr = mmap(NULL, shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
+    ERR("mmap");
+}
