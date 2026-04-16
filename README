@@ -1,21 +1,17 @@
 tutaj wazne rzeczy:
 
-//TWORZENIE SHARED MUTEX :D
+//TWORZENIE SHARED MUTEX :D   PAMIETAJ ZEBY DESTROY I ATRYBUTY TEZ DESTROY
 
 typedef struct {
     pthread_mutex_t mutex;
-    int counter;
 } shared_t;
 
-shared_t *sh = mmap(...);
 
+//dawanie atrybutow (skopiuj to cale pp) ;p
+shared_t *sh = mmap(...);
 pthread_mutexattr_t attr;
 pthread_mutexattr_init(&attr);
-
-// to robi go między procesami
 pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
-
-// to robi go robust
 pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST);
 
 // init mutexa
@@ -25,12 +21,11 @@ pthread_mutex_init(&sh->mutex, &attr);
 
 int err = pthread_mutex_lock(&sh->mutex);
 
+//to dajesz jak chcesz sprawdzic czy proces ktory rozpoczal ten mutex umarl ;p
 if (err == EOWNERDEAD) {
     printf("poprzedni proces umarl\n");
     pthread_mutex_consistent(&sh->mutex);
 }
-
-sh->counter++;
 
 pthread_mutex_unlock(&sh->mutex);
 
@@ -48,11 +43,9 @@ shared_t *sh = mmap(...);
 
 pthread_barrierattr_t attr;
 pthread_barrierattr_init(&attr);
-
-// kluczowe
 pthread_barrierattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
 
-// 3 procesy
+// 3 procesy tutaj no wiadomo mozna dac ilekolwiek
 pthread_barrier_init(&sh->barrier, &attr, 3);
 
 //uzycie
@@ -62,6 +55,101 @@ printf("before barrier\n");
 pthread_barrier_wait(&sh->barrier);
 
 printf("after barrier\n");
+
+//POZNIEJ PAMIETAJ
+
+pthread_barrier_destroy()
+pthread_barrierattr_destroy()
+
+
+
+
+
+
+//shared memory object
+
+int fd = shm_open("/my_mem", O_CREAT | O_RDWR, 0666);
+ftruncate(fd, 1024);
+
+char *mem = mmap(NULL, 1024, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+
+//USUWANIE TEGO
+shm_unlink("/my_mem");
+
+
+
+
+
+
+
+
+
+//MMAP BEZ PLIKU
+
+void *ptr = mmap(NULL, SIZE,
+                 PROT_READ | PROT_WRITE,
+                 MAP_SHARED | MAP_ANONYMOUS,
+                 -1, 0);
+
+//UZYCIE
+
+int *arr = mmap(...);
+arr[0] = 10;
+
+
+//MMAP Z PLIKIEM
+
+int fd = open("file.txt", O_RDONLY);
+
+struct stat st;
+fstat(fd, &st);
+size_t size = st.st_size;
+
+char *data = mmap(NULL, size,
+                  PROT_READ,
+                  MAP_PRIVATE,
+                  fd, 0);
+
+//ZAMYKANIE
+close(fd);
+
+//CZYTANIE
+printf("%c\n", data[0]);
+printf("%c\n", data[10]);
+
+//LUB
+for (int i = 0; i < size; i++) {
+    putchar(data[i]);
+}
+
+
+//PISANIE
+//DZIALA TYLKO JAK      mmap(NULL, size,PROT_READ | PROT_WRITE,MAP_SHARED,fd, 0);
+
+data[0] = 'A';
+
+//TUTAJ SPRAWDZANIE CRASHA
+
+int status;
+int crashed = 0;
+
+for (int i = 0; i < N; i++) {
+    wait(&status);
+
+    if (!WIFEXITED(status)) {
+        crashed = 1;
+    }
+}
+
+if (crashed) {
+    printf("FAIL\n");
+} else {
+    printf("OK + wyniki\n");
+}
+
+
+
+
 
 
 
@@ -98,14 +186,6 @@ int main() {
 
     while (wait(NULL) > 0);
 }
-
-//shared memory object
-
-int fd = shm_open("/my_mem", O_CREAT | O_RDWR, 0666);
-ftruncate(fd, 1024);
-
-char *mem = mmap(NULL, 1024, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-
 
 
 link do polskich sopow:
